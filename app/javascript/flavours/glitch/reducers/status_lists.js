@@ -1,11 +1,9 @@
+import { Map as ImmutableMap, OrderedSet as ImmutableOrderedSet } from 'immutable';
+
 import {
-  FAVOURITED_STATUSES_FETCH_REQUEST,
-  FAVOURITED_STATUSES_FETCH_SUCCESS,
-  FAVOURITED_STATUSES_FETCH_FAIL,
-  FAVOURITED_STATUSES_EXPAND_REQUEST,
-  FAVOURITED_STATUSES_EXPAND_SUCCESS,
-  FAVOURITED_STATUSES_EXPAND_FAIL,
-} from 'flavours/glitch/actions/favourites';
+  blockAccountSuccess,
+  muteAccountSuccess,
+} from '../actions/accounts';
 import {
   BOOKMARKED_STATUSES_FETCH_REQUEST,
   BOOKMARKED_STATUSES_FETCH_SUCCESS,
@@ -13,19 +11,15 @@ import {
   BOOKMARKED_STATUSES_EXPAND_REQUEST,
   BOOKMARKED_STATUSES_EXPAND_SUCCESS,
   BOOKMARKED_STATUSES_EXPAND_FAIL,
-} from 'flavours/glitch/actions/bookmarks';
+} from '../actions/bookmarks';
 import {
-  PINNED_STATUSES_FETCH_SUCCESS,
-} from 'flavours/glitch/actions/pin_statuses';
-import {
-  TRENDS_STATUSES_FETCH_REQUEST,
-  TRENDS_STATUSES_FETCH_SUCCESS,
-  TRENDS_STATUSES_FETCH_FAIL,
-  TRENDS_STATUSES_EXPAND_REQUEST,
-  TRENDS_STATUSES_EXPAND_SUCCESS,
-  TRENDS_STATUSES_EXPAND_FAIL,
-} from 'flavours/glitch/actions/trends';
-import { Map as ImmutableMap, List as ImmutableList } from 'immutable';
+  FAVOURITED_STATUSES_FETCH_REQUEST,
+  FAVOURITED_STATUSES_FETCH_SUCCESS,
+  FAVOURITED_STATUSES_FETCH_FAIL,
+  FAVOURITED_STATUSES_EXPAND_REQUEST,
+  FAVOURITED_STATUSES_EXPAND_SUCCESS,
+  FAVOURITED_STATUSES_EXPAND_FAIL,
+} from '../actions/favourites';
 import {
   FAVOURITE_SUCCESS,
   UNFAVOURITE_SUCCESS,
@@ -33,32 +27,41 @@ import {
   UNBOOKMARK_SUCCESS,
   PIN_SUCCESS,
   UNPIN_SUCCESS,
-} from 'flavours/glitch/actions/interactions';
+} from '../actions/interactions';
 import {
-  ACCOUNT_BLOCK_SUCCESS,
-  ACCOUNT_MUTE_SUCCESS,
-} from 'flavours/glitch/actions/accounts';
+  PINNED_STATUSES_FETCH_SUCCESS,
+} from '../actions/pin_statuses';
+import {
+  TRENDS_STATUSES_FETCH_REQUEST,
+  TRENDS_STATUSES_FETCH_SUCCESS,
+  TRENDS_STATUSES_FETCH_FAIL,
+  TRENDS_STATUSES_EXPAND_REQUEST,
+  TRENDS_STATUSES_EXPAND_SUCCESS,
+  TRENDS_STATUSES_EXPAND_FAIL,
+} from '../actions/trends';
+
+
 
 const initialState = ImmutableMap({
   favourites: ImmutableMap({
     next: null,
     loaded: false,
-    items: ImmutableList(),
+    items: ImmutableOrderedSet(),
   }),
   bookmarks: ImmutableMap({
     next: null,
     loaded: false,
-    items: ImmutableList(),
+    items: ImmutableOrderedSet(),
   }),
   pins: ImmutableMap({
     next: null,
     loaded: false,
-    items: ImmutableList(),
+    items: ImmutableOrderedSet(),
   }),
   trending: ImmutableMap({
     next: null,
     loaded: false,
-    items: ImmutableList(),
+    items: ImmutableOrderedSet(),
   }),
 });
 
@@ -67,7 +70,7 @@ const normalizeList = (state, listType, statuses, next) => {
     map.set('next', next);
     map.set('loaded', true);
     map.set('isLoading', false);
-    map.set('items', ImmutableList(statuses.map(item => item.id)));
+    map.set('items', ImmutableOrderedSet(statuses.map(item => item.id)));
   }));
 };
 
@@ -75,20 +78,22 @@ const appendToList = (state, listType, statuses, next) => {
   return state.update(listType, listMap => listMap.withMutations(map => {
     map.set('next', next);
     map.set('isLoading', false);
-    map.set('items', map.get('items').concat(statuses.map(item => item.id)));
+    map.set('items', map.get('items').union(statuses.map(item => item.id)));
   }));
 };
 
 const prependOneToList = (state, listType, status) => {
-  return state.update(listType, listMap => listMap.withMutations(map => {
-    map.set('items', map.get('items').unshift(status.get('id')));
-  }));
+  return state.updateIn([listType, 'items'], (list) => {
+    if (list.includes(status.get('id'))) {
+      return list;
+    } else {
+      return ImmutableOrderedSet([status.get('id')]).union(list);
+    }
+  });
 };
 
 const removeOneFromList = (state, listType, status) => {
-  return state.update(listType, listMap => listMap.withMutations(map => {
-    map.set('items', map.get('items').filter(item => item !== status.get('id')));
-  }));
+  return state.updateIn([listType, 'items'], (list) => list.delete(status.get('id')));
 };
 
 export default function statusLists(state = initialState, action) {
@@ -137,10 +142,10 @@ export default function statusLists(state = initialState, action) {
     return prependOneToList(state, 'pins', action.status);
   case UNPIN_SUCCESS:
     return removeOneFromList(state, 'pins', action.status);
-  case ACCOUNT_BLOCK_SUCCESS:
-  case ACCOUNT_MUTE_SUCCESS:
-    return state.updateIn(['trending', 'items'], ImmutableList(), list => list.filterNot(statusId => action.statuses.getIn([statusId, 'account']) === action.relationship.id));
+  case blockAccountSuccess.type:
+  case muteAccountSuccess.type:
+    return state.updateIn(['trending', 'items'], ImmutableOrderedSet(), list => list.filterNot(statusId => action.payload.statuses.getIn([statusId, 'account']) === action.payload.relationship.id));
   default:
     return state;
   }
-};
+}

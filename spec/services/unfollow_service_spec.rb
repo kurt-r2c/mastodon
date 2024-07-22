@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require 'rails_helper'
 
-RSpec.describe UnfollowService, type: :service do
-  let(:sender) { Fabricate(:account, username: 'alice') }
+RSpec.describe UnfollowService do
+  subject { described_class.new }
 
-  subject { UnfollowService.new }
+  let(:sender) { Fabricate(:account, username: 'alice') }
 
   describe 'local' do
     let(:bob) { Fabricate(:account, username: 'bob') }
@@ -18,7 +20,7 @@ RSpec.describe UnfollowService, type: :service do
     end
   end
 
-  describe 'remote ActivityPub' do
+  describe 'remote ActivityPub', :inline_jobs do
     let(:bob) { Fabricate(:account, username: 'bob', protocol: :activitypub, domain: 'example.com', inbox_url: 'http://example.com/inbox') }
 
     before do
@@ -36,7 +38,7 @@ RSpec.describe UnfollowService, type: :service do
     end
   end
 
-  describe 'remote ActivityPub (reverse)' do
+  describe 'remote ActivityPub (reverse)', :inline_jobs do
     let(:bob) { Fabricate(:account, username: 'bob', protocol: :activitypub, domain: 'example.com', inbox_url: 'http://example.com/inbox') }
 
     before do
